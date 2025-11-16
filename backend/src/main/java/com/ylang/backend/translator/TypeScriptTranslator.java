@@ -304,11 +304,7 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
         return result.toString();
     }
     
-    @Override
-    public String visitBlock(BlockNode node) {
-        // This is handled in visitFunctionDeclaration and other places
-        return "";
-    }
+    
     
     @Override
     public String visitExpressionStatement(ExpressionStatementNode node) {
@@ -474,11 +470,7 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
         return result.toString();
     }
     
-    @Override
-    public String visitLoopStatement(LoopStatementNode node) {
-        // This is already implemented above, but needed for interface
-        return "";
-    }
+    
     
     @Override
     public String visitModuleDeclaration(ModuleDeclarationNode node) {
@@ -560,7 +552,7 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
         
         // Add structure members
         for (ASTNode member : node.getMembers()) {
-            result.append(statement.accept(this));
+            result.append(member.accept(this));
             result.append("\n");
         }
         
@@ -575,23 +567,11 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
         return "import { " + node.getModuleName() + " } from './" + node.getModuleName() + "';\n";
     }
     
-    @Override
-    public String visitAssignment(AssignmentNode node) {
-        // This is already implemented above, but needed for interface
-        return "";
-    }
     
-    @Override
-    public String visitIfStatement(IfStatementNode node) {
-        // This is already implemented above, but needed for interface
-        return "";
-    }
     
-    @Override
-    public String visitReturnStatement(ReturnStatementNode node) {
-        // This is already implemented above, but needed for interface
-        return "";
-    }
+    
+    
+    
     
     @Override
     public String visitMemberAccess(MemberAccessNode node) {

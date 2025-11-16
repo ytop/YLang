@@ -149,14 +149,175 @@ public class CompilationService {
      */
     private List<String> generateWarnings(ProgramNode ast) {
         List<String> warnings = new ArrayList<>();
-        
-        // TODO: Implement semantic analysis to generate warnings
-        // Examples:
-        // - Unused variables
-        // - Potential type issues
-        // - Performance suggestions
-        // - Style recommendations
-        
+
+        if (ast == null) {
+            return warnings;
+        }
+
+        // Unreachable code detection within blocks
+        for (var statement : ast.getStatements()) {
+            detectUnreachableInNode(statement, warnings);
+        }
+
+        // Unused variables per block and function
+        for (var statement : ast.getStatements()) {
+            detectUnusedVariables(statement, warnings);
+        }
+
+        // Simple type issues for constant expressions
+        for (var statement : ast.getStatements()) {
+            detectLiteralTypeMismatches(statement, warnings);
+        }
+
         return warnings;
+    }
+
+    private void detectUnreachableInNode(com.ylang.backend.ast.ASTNode node, List<String> warnings) {
+        if (node instanceof com.ylang.backend.ast.BlockNode block) {
+            boolean seenReturn = false;
+            for (com.ylang.backend.ast.ASTNode stmt : block.getStatements()) {
+                if (seenReturn) {
+                    String location = formatLocation(stmt);
+                    warnings.add("Unreachable code after return" + location);
+                }
+                if (stmt instanceof com.ylang.backend.ast.ReturnStatementNode) {
+                    seenReturn = true;
+                }
+                detectUnreachableInNode(stmt, warnings);
+            }
+        } else if (node instanceof com.ylang.backend.ast.IfStatementNode ifStmt) {
+            if (ifStmt.getThenBlock() != null) detectUnreachableInNode(ifStmt.getThenBlock(), warnings);
+            if (ifStmt.hasElseBlock() && ifStmt.getElseBlock() != null) detectUnreachableInNode(ifStmt.getElseBlock(), warnings);
+        } else if (node instanceof com.ylang.backend.ast.LoopStatementNode loop) {
+            if (loop.getBody() != null) detectUnreachableInNode(loop.getBody(), warnings);
+        } else if (node instanceof com.ylang.backend.ast.FunctionDeclarationNode fn) {
+            if (fn.getBody() != null) detectUnreachableInNode(fn.getBody(), warnings);
+        }
+    }
+
+    private void detectUnusedVariables(com.ylang.backend.ast.ASTNode node, List<String> warnings) {
+        if (node instanceof com.ylang.backend.ast.FunctionDeclarationNode fn) {
+            var body = fn.getBody();
+            if (body != null) {
+                for (com.ylang.backend.ast.ASTNode stmt : body.getStatements()) {
+                    if (stmt instanceof com.ylang.backend.ast.VariableDeclarationNode varDecl) {
+                        String name = varDecl.getName();
+                        int uses = countIdentifierUsage(body, name);
+                        if (uses == 0) {
+                            String location = formatLocation(varDecl);
+                            warnings.add("Unused variable '" + name + "'" + location);
+                        }
+                    }
+                }
+            }
+        } else if (node instanceof com.ylang.backend.ast.BlockNode block) {
+            for (com.ylang.backend.ast.ASTNode stmt : block.getStatements()) {
+                detectUnusedVariables(stmt, warnings);
+            }
+        }
+    }
+
+    private int countIdentifierUsage(com.ylang.backend.ast.ASTNode node, String name) {
+        int count = 0;
+        if (node instanceof com.ylang.backend.ast.IdentifierNode id) {
+            if (name.equals(id.getName())) count++;
+        } else if (node instanceof com.ylang.backend.ast.BlockNode block) {
+            for (com.ylang.backend.ast.ASTNode stmt : block.getStatements()) {
+                count += countIdentifierUsage(stmt, name);
+            }
+        } else if (node instanceof com.ylang.backend.ast.AssignmentNode asn) {
+            count += countIdentifierUsage(asn.getValue(), name);
+        } else if (node instanceof com.ylang.backend.ast.ExpressionStatementNode exprStmt) {
+            count += countIdentifierUsage(exprStmt.getExpression(), name);
+        } else if (node instanceof com.ylang.backend.ast.FunctionCallNode call) {
+            for (com.ylang.backend.ast.ExpressionNode arg : call.getArguments()) {
+                count += countIdentifierUsage(arg, name);
+            }
+        } else if (node instanceof com.ylang.backend.ast.BinaryExpressionNode bin) {
+            count += countIdentifierUsage(bin.getLeft(), name);
+            count += countIdentifierUsage(bin.getRight(), name);
+        } else if (node instanceof com.ylang.backend.ast.UnaryExpressionNode un) {
+            count += countIdentifierUsage(un.getOperand(), name);
+        } else if (node instanceof com.ylang.backend.ast.IfStatementNode ifStmt) {
+            count += countIdentifierUsage(ifStmt.getCondition(), name);
+            if (ifStmt.getThenBlock() != null) count += countIdentifierUsage(ifStmt.getThenBlock(), name);
+            if (ifStmt.getElseBlock() != null) count += countIdentifierUsage(ifStmt.getElseBlock(), name);
+        } else if (node instanceof com.ylang.backend.ast.LoopStatementNode loop) {
+            if (loop.getIterable() != null) count += countIdentifierUsage(loop.getIterable(), name);
+            if (loop.getCondition() != null) count += countIdentifierUsage(loop.getCondition(), name);
+            if (loop.getBody() != null) count += countIdentifierUsage(loop.getBody(), name);
+        } else if (node instanceof com.ylang.backend.ast.ParenthesizedExpressionNode p) {
+            count += countIdentifierUsage(p.getExpression(), name);
+        } else if (node instanceof com.ylang.backend.ast.ListExpressionNode list) {
+            for (com.ylang.backend.ast.ExpressionNode el : list.getElements()) {
+                count += countIdentifierUsage(el, name);
+            }
+        } else if (node instanceof com.ylang.backend.ast.MapExpressionNode map) {
+            for (com.ylang.backend.ast.MapEntryNode e : map.getEntries()) {
+                count += countIdentifierUsage(e.getKey(), name);
+                count += countIdentifierUsage(e.getValue(), name);
+            }
+        } else if (node instanceof com.ylang.backend.ast.MemberAccessNode mem) {
+            count += countIdentifierUsage(mem.getObject(), name);
+            count += countIdentifierUsage(mem.getMember(), name);
+        } else if (node instanceof com.ylang.backend.ast.TypeCastNode cast) {
+            count += countIdentifierUsage(cast.getExpression(), name);
+        }
+        return count;
+    }
+
+    private void detectLiteralTypeMismatches(com.ylang.backend.ast.ASTNode node, List<String> warnings) {
+        if (node instanceof com.ylang.backend.ast.BinaryExpressionNode bin) {
+            var left = bin.getLeft();
+            var right = bin.getRight();
+            if (bin.getOperator() == com.ylang.backend.ast.BinaryExpressionNode.Operator.PLUS
+                    && left instanceof com.ylang.backend.ast.LiteralNode l
+                    && right instanceof com.ylang.backend.ast.LiteralNode r) {
+                boolean lStr = l.getLiteralType() == com.ylang.backend.ast.LiteralNode.LiteralType.STRING;
+                boolean rStr = r.getLiteralType() == com.ylang.backend.ast.LiteralNode.LiteralType.STRING;
+                boolean lNum = l.getLiteralType() == com.ylang.backend.ast.LiteralNode.LiteralType.NUMBER;
+                boolean rNum = r.getLiteralType() == com.ylang.backend.ast.LiteralNode.LiteralType.NUMBER;
+                if ((lStr && rNum) || (lNum && rStr)) {
+                    String location = formatLocation(bin);
+                    warnings.add("Suspicious string-number concatenation" + location);
+                }
+            }
+        }
+
+        if (node instanceof com.ylang.backend.ast.BlockNode block) {
+            for (com.ylang.backend.ast.ASTNode stmt : block.getStatements()) {
+                detectLiteralTypeMismatches(stmt, warnings);
+            }
+        } else if (node instanceof com.ylang.backend.ast.FunctionDeclarationNode fn) {
+            if (fn.getBody() != null) detectLiteralTypeMismatches(fn.getBody(), warnings);
+        } else if (node instanceof com.ylang.backend.ast.IfStatementNode ifStmt) {
+            detectLiteralTypeMismatches(ifStmt.getCondition(), warnings);
+            if (ifStmt.getThenBlock() != null) detectLiteralTypeMismatches(ifStmt.getThenBlock(), warnings);
+            if (ifStmt.getElseBlock() != null) detectLiteralTypeMismatches(ifStmt.getElseBlock(), warnings);
+        } else if (node instanceof com.ylang.backend.ast.LoopStatementNode loop) {
+            if (loop.getCondition() != null) detectLiteralTypeMismatches(loop.getCondition(), warnings);
+            if (loop.getIterable() != null) detectLiteralTypeMismatches(loop.getIterable(), warnings);
+            if (loop.getBody() != null) detectLiteralTypeMismatches(loop.getBody(), warnings);
+        } else if (node instanceof com.ylang.backend.ast.ExpressionStatementNode exprStmt) {
+            detectLiteralTypeMismatches(exprStmt.getExpression(), warnings);
+        } else if (node instanceof com.ylang.backend.ast.AssignmentNode asn) {
+            detectLiteralTypeMismatches(asn.getValue(), warnings);
+        } else if (node instanceof com.ylang.backend.ast.FunctionCallNode call) {
+            for (com.ylang.backend.ast.ExpressionNode arg : call.getArguments()) {
+                detectLiteralTypeMismatches(arg, warnings);
+            }
+        }
+    }
+
+    private String formatLocation(com.ylang.backend.ast.ASTNode node) {
+        int line = node.getLine();
+        int col = node.getColumn();
+        if (line >= 0 && col >= 0) {
+            return " (Line " + line + ":" + col + ")";
+        }
+        if (line >= 0) {
+            return " (Line " + line + ")";
+        }
+        return "";
     }
 }

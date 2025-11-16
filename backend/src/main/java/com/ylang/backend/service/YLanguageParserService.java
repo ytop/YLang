@@ -5,6 +5,8 @@ import com.ylang.backend.ast.ProgramNode;
 import com.ylang.backend.exception.YLanguageParseException;
 import com.ylang.backend.model.ParseResult;
 import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.tree.*;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -31,7 +33,7 @@ public class YLanguageParserService {
             logger.debug("Starting to parse Y language source code");
             
             // Create ANTLR input stream
-            ANTLRInputStream input = new ANTLRInputStream(sourceCode);
+            CharStream input = CharStreams.fromString(sourceCode);
             
             // Create lexer
             YLanguageLexer lexer = new YLanguageLexer(input);
