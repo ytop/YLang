@@ -501,7 +501,7 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
         increaseIndent();
         
         // Add function signatures
-        for (FunctionSignatureNode signature : node.getFunctionSignatures()) {
+        for (TraitDeclarationNode.FunctionSignatureNode signature : node.getFunctionSignatures()) {
             result.append(indent()).append(signature.getName()).append("(");
             
             // Add parameters
@@ -605,12 +605,11 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
         StringBuilder result = new StringBuilder();
         result.append("{\n");
         
-        List<MapEntryNode> entries = node.getEntries();
+        List<MapExpressionNode.KeyValuePair> entries = node.getPairs();
         for (int i = 0; i < entries.size(); i++) {
             if (i > 0) result.append(",\n");
             result.append(indent()).append(INDENT);
             
-            // Handle key - if it's a string, don't quote it again
             String key = entries.get(i).getKey().accept(this);
             if (key.startsWith("\"") && key.endsWith("\"")) {
                 result.append(key);

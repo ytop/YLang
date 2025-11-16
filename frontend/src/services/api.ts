@@ -52,7 +52,10 @@ class YLanguageApiService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ errors: ['Unknown error'] }));
-        throw new Error(errorData.errors?.[0] || `HTTP ${response.status}: ${response.statusText}`);
+        const message = Array.isArray(errorData.errors) && errorData.errors.length > 0
+          ? errorData.errors.join('; ')
+          : `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(message);
       }
 
       return await response.json();

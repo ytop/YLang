@@ -68,7 +68,9 @@ public class ASTBuilderVisitor extends YLanguageBaseVisitor<ASTNode> {
             yummyComment = ctx.description().getText();
         }
         
-        return new FunctionDeclarationNode(name, parameters, returnType, body, isAsync, yummyComment);
+        FunctionDeclarationNode node = new FunctionDeclarationNode(name, parameters, returnType, body, isAsync, yummyComment);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
@@ -81,7 +83,9 @@ public class ASTBuilderVisitor extends YLanguageBaseVisitor<ASTNode> {
             yummyComment = ctx.description().getText();
         }
         
-        return new ParameterNode(name, type, yummyComment);
+        ParameterNode node = new ParameterNode(name, type, yummyComment);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
@@ -89,16 +93,18 @@ public class ASTBuilderVisitor extends YLanguageBaseVisitor<ASTNode> {
         String name = ctx.identifier().getText();
         TypeNode type = visitType(ctx.type());
         ExpressionNode initializer = visitExpression(ctx.expression());
-        
-        return new VariableDeclarationNode(name, type, initializer);
+        VariableDeclarationNode node = new VariableDeclarationNode(name, type, initializer);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
     public AssignmentNode visitAssignment(YLanguageParser.AssignmentContext ctx) {
         String variableName = ctx.identifier().getText();
         ExpressionNode value = visitExpression(ctx.expression());
-        
-        return new AssignmentNode(variableName, value);
+        AssignmentNode node = new AssignmentNode(variableName, value);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
@@ -106,20 +112,25 @@ public class ASTBuilderVisitor extends YLanguageBaseVisitor<ASTNode> {
         ExpressionNode condition = visitExpression(ctx.expression());
         BlockNode thenBlock = visitBlock(ctx.block(0));
         BlockNode elseBlock = ctx.block().size() > 1 ? visitBlock(ctx.block(1)) : null;
-        
-        return new IfStatementNode(condition, thenBlock, elseBlock);
+        IfStatementNode node = new IfStatementNode(condition, thenBlock, elseBlock);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
     public ReturnStatementNode visitReturnStatement(YLanguageParser.ReturnStatementContext ctx) {
         ExpressionNode value = ctx.expression() != null ? visitExpression(ctx.expression()) : null;
-        return new ReturnStatementNode(value);
+        ReturnStatementNode node = new ReturnStatementNode(value);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
     public ExpressionStatementNode visitExpressionStatement(YLanguageParser.ExpressionStatementContext ctx) {
         ExpressionNode expression = visitExpression(ctx.expression());
-        return new ExpressionStatementNode(expression);
+        ExpressionStatementNode node = new ExpressionStatementNode(expression);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
@@ -151,18 +162,28 @@ public class ASTBuilderVisitor extends YLanguageBaseVisitor<ASTNode> {
             String value = ctx.STRING().getText();
             // Remove quotes
             value = value.substring(1, value.length() - 1);
-            return new LiteralNode(LiteralNode.LiteralType.STRING, value);
+            LiteralNode node = new LiteralNode(LiteralNode.LiteralType.STRING, value);
+            node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            return node;
         } else if (ctx.NUMBER() != null) {
             String numberText = ctx.NUMBER().getText();
             Number value = numberText.contains(".") ? Double.parseDouble(numberText) : Long.parseLong(numberText);
-            return new LiteralNode(LiteralNode.LiteralType.NUMBER, value);
+            LiteralNode node = new LiteralNode(LiteralNode.LiteralType.NUMBER, value);
+            node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            return node;
         } else if (ctx.BOOLEAN() != null) {
             Boolean value = Boolean.parseBoolean(ctx.BOOLEAN().getText());
-            return new LiteralNode(LiteralNode.LiteralType.BOOLEAN, value);
+            LiteralNode node = new LiteralNode(LiteralNode.LiteralType.BOOLEAN, value);
+            node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            return node;
         } else if (ctx.EMPTY() != null && ctx.LIST() != null) {
-            return new LiteralNode(LiteralNode.LiteralType.EMPTY_LIST, null);
+            LiteralNode node = new LiteralNode(LiteralNode.LiteralType.EMPTY_LIST, null);
+            node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            return node;
         } else if (ctx.EMPTY() != null && ctx.MAP() != null) {
-            return new LiteralNode(LiteralNode.LiteralType.EMPTY_MAP, null);
+            LiteralNode node = new LiteralNode(LiteralNode.LiteralType.EMPTY_MAP, null);
+            node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            return node;
         }
         
         return null;
@@ -213,7 +234,9 @@ public class ASTBuilderVisitor extends YLanguageBaseVisitor<ASTNode> {
     @Override
     public ParenthesizedExpressionNode visitParenthesizedExpression(YLanguageParser.ParenthesizedExpressionContext ctx) {
         ExpressionNode expression = visitExpression(ctx.expression());
-        return new ParenthesizedExpressionNode(expression);
+        ParenthesizedExpressionNode node = new ParenthesizedExpressionNode(expression);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     @Override
@@ -227,7 +250,9 @@ public class ASTBuilderVisitor extends YLanguageBaseVisitor<ASTNode> {
             }
         }
         
-        return new BlockNode(statements);
+        BlockNode node = new BlockNode(statements);
+        node.setLocation(ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return node;
     }
     
     // Helper methods

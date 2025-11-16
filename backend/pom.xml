@@ -20,6 +20,7 @@
         <antlr4.version>4.13.1</antlr4.version>
         <junit.version>5.10.0</junit.version>
         <mockito.version>5.5.0</mockito.version>
+        <antlr4Skip>false</antlr4Skip>
     </properties>
 
     <dependencies>
@@ -117,6 +118,7 @@
                     <outputDirectory>src/main/java</outputDirectory>
                     <visitor>true</visitor>
                     <listener>true</listener>
+                    <skip>${antlr4Skip}</skip>
                 </configuration>
                 <executions>
                     <execution>

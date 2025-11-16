@@ -501,7 +501,7 @@ public class RustTranslator implements ASTVisitor<String> {
         increaseIndent();
         
         // Add function signatures
-        for (FunctionSignatureNode signature : node.getFunctionSignatures()) {
+        for (TraitDeclarationNode.FunctionSignatureNode signature : node.getFunctionSignatures()) {
             result.append(indent()).append("fn ").append(signature.getName()).append("(");
             
             // Add parameters
@@ -604,15 +604,20 @@ public class RustTranslator implements ASTVisitor<String> {
     public String visitMapExpression(MapExpressionNode node) {
         StringBuilder result = new StringBuilder();
         result.append("{\n");
+        result.append(indent()).append(INDENT).append("let mut m = HashMap::new();\n");
         
-        List<MapEntryNode> entries = node.getEntries();
+        List<MapExpressionNode.KeyValuePair> entries = node.getPairs();
         for (int i = 0; i < entries.size(); i++) {
-            if (i > 0) result.append(",\n");
-            result.append(indent()).append(INDENT).append(entries.get(i).getKey().accept(this));
-            result.append(" => ").append(entries.get(i).getValue().accept(this));
+            result.append(indent()).append(INDENT)
+                  .append("m.insert(")
+                  .append(entries.get(i).getKey().accept(this))
+                  .append(", ")
+                  .append(entries.get(i).getValue().accept(this))
+                  .append(");\n");
         }
         
-        result.append("\n").append(indent()).append("}");
+        result.append(indent()).append(INDENT).append("m\n");
+        result.append(indent()).append("}");
         return result.toString();
     }
     
