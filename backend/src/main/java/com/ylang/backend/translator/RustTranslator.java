@@ -413,14 +413,65 @@ public class RustTranslator implements ASTVisitor<String> {
     
     @Override
     public String visitTryStatement(TryStatementNode node) {
-        // TODO: Implement try-catch translation
-        return "// Try statement not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("match std::panic::catch_unwind(|| {\n");
+        
+        // Increase indent for try block
+        increaseIndent();
+        result.append(node.getTryBlock().accept(this));
+        decreaseIndent();
+        
+        result.append(indent()).append("}) {\n");
+        result.append(indent()).append("    Ok(result) => result,\n");
+        result.append(indent()).append("    Err(_) => {\n");
+        
+        // Handle catch blocks
+        for (TryStatementNode.CatchClause catchClause : node.getCatchClauses()) {
+            increaseIndent();
+            result.append(indent()).append("// Error handling: ").append(catchClause.getVariableName()).append("\n");
+            result.append(catchClause.getCatchBlock().accept(this));
+            decreaseIndent();
+        }
+        
+        result.append(indent()).append("    }\n");
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
     }
     
     @Override
     public String visitMatchStatement(MatchStatementNode node) {
-        // TODO: Implement match statement translation
-        return "// Match statement not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("match ").append(node.getExpression().accept(this)).append(" {\n");
+        
+        for (MatchStatementNode.MatchCase matchCase : node.getCases()) {
+            increaseIndent();
+            
+            // Handle different pattern types
+            String pattern = matchCase.getPattern();
+            if (matchCase.getType() != null) {
+                if (matchCase.getVariableName() != null) {
+                    // Pattern with variable binding
+                    result.append(indent()).append(pattern).append(" { ").append(matchCase.getVariableName()).append(" } => {\n");
+                } else {
+                    // Simple type pattern
+                    result.append(indent()).append(pattern).append(" => {\n");
+                }
+            } else {
+                // Simple identifier pattern
+                result.append(indent()).append(pattern).append(" => {\n");
+            }
+            
+            // Add case block
+            increaseIndent();
+            result.append(matchCase.getBlock().accept(this));
+            decreaseIndent();
+            result.append(indent()).append("},\n");
+            decreaseIndent();
+        }
+        
+        result.append(indent()).append("}\n");
+        return result.toString();
     }
     
     @Override
@@ -431,26 +482,97 @@ public class RustTranslator implements ASTVisitor<String> {
     
     @Override
     public String visitModuleDeclaration(ModuleDeclarationNode node) {
-        // TODO: Implement module translation
-        return "// Module declaration not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("pub mod ").append(node.getName()).append(" {\n");
+        
+        // Increase indent for module contents
+        increaseIndent();
+        
+        // Add module statements
+        for (ASTNode statement : node.getStatements()) {
+            result.append(statement.accept(this));
+            result.append("\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
     }
     
     @Override
     public String visitTraitDeclaration(TraitDeclarationNode node) {
-        // TODO: Implement trait translation
-        return "// Trait declaration not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("pub trait ").append(node.getName()).append(" {\n");
+        
+        // Increase indent for trait contents
+        increaseIndent();
+        
+        // Add function signatures
+        for (FunctionSignatureNode signature : node.getFunctionSignatures()) {
+            result.append(indent()).append("fn ").append(signature.getName()).append("(");
+            
+            // Add parameters
+            List<ParameterNode> parameters = signature.getParameters();
+            for (int i = 0; i < parameters.size(); i++) {
+                if (i > 0) result.append(", ");
+                ParameterNode param = parameters.get(i);
+                result.append(param.getName()).append(": ").append(translateType(param.getType()));
+            }
+            
+            result.append(")");
+            
+            // Add return type
+            if (signature.getReturnType() != null && !signature.getReturnType().isNothingType()) {
+                result.append(" -> ").append(translateType(signature.getReturnType()));
+            }
+            
+            result.append(";\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
     }
     
     @Override
     public String visitStructureDeclaration(StructureDeclarationNode node) {
-        // TODO: Implement structure translation
-        return "// Structure declaration not yet implemented";
+        StringBuilder result = new StringBuilder();
+        
+        // Handle generic type parameter
+        String genericParam = "";
+        if (node.getGenericType() != null) {
+            genericParam = "<" + node.getGenericType() + ">";
+        }
+        
+        result.append(indent()).append("pub struct ").append(node.getName()).append(genericParam);
+        
+        // Handle trait implementation
+        if (node.getImplementsTrait() != null) {
+            result.append(" /* implements ").append(node.getImplementsTrait()).append(" */");
+        }
+        
+        result.append(" {\n");
+        
+        // Increase indent for structure contents
+        increaseIndent();
+        
+        // Add structure members
+        for (ASTNode member : node.getMembers()) {
+            result.append(statement.accept(this));
+            result.append("\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
     }
     
     @Override
     public String visitImportStatement(ImportStatementNode node) {
-        // TODO: Implement import translation
-        return "// Import statement not yet implemented";
+        return "use " + node.getModuleName().replace("::", "::") + ";\n";
     }
     
     @Override
@@ -473,30 +595,211 @@ public class RustTranslator implements ASTVisitor<String> {
     
     @Override
     public String visitMemberAccess(MemberAccessNode node) {
-        // TODO: Implement member access translation
-        return "// Member access not yet implemented";
+        String object = node.getObject().accept(this);
+        String member = node.getMember().accept(this);
+        
+        if (node.isArrayAccess()) {
+            return object + "[" + member + "]";
+        } else {
+            return object + "." + member;
+        }
     }
     
     @Override
     public String visitListExpression(ListExpressionNode node) {
-        // TODO: Implement list expression translation
-        return "vec![]";
+        StringBuilder result = new StringBuilder();
+        result.append("vec![");
+        
+        List<ExpressionNode> elements = node.getElements();
+        for (int i = 0; i < elements.size(); i++) {
+            if (i > 0) result.append(", ");
+            result.append(elements.get(i).accept(this));
+        }
+        
+        result.append("]");
+        return result.toString();
     }
     
     @Override
     public String visitMapExpression(MapExpressionNode node) {
-        // TODO: Implement map expression translation
-        return "HashMap::new()";
+        StringBuilder result = new StringBuilder();
+        result.append("{\n");
+        
+        List<MapEntryNode> entries = node.getEntries();
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) result.append(",\n");
+            result.append(indent()).append(INDENT).append(entries.get(i).getKey().accept(this));
+            result.append(" => ").append(entries.get(i).getValue().accept(this));
+        }
+        
+        result.append("\n").append(indent()).append("}");
+        return result.toString();
     }
     
     @Override
     public String visitTypeCast(TypeCastNode node) {
-        // TODO: Implement type cast translation
-        return node.getExpression().accept(this);
+        String expression = node.getExpression().accept(this);
+        
+        switch (node.getCastType()) {
+            case TO_STRING:
+                return expression + ".to_string()";
+            case TO_NUMBER:
+                return expression + ".parse::<f64>().unwrap()";
+            case TO_BOOLEAN:
+                return "!" + expression + ".is_empty()";
+            default:
+                return expression;
+        }
     }
     
     @Override
     public String visitParenthesizedExpression(ParenthesizedExpressionNode node) {
         return "(" + node.getExpression().accept(this) + ")";
+    }
+    
+    @Override
+    public String visitEnumDeclaration(EnumDeclarationNode node) {
+        StringBuilder result = new StringBuilder();
+        
+        // Handle generic type parameter
+        String genericParam = "";
+        if (node.getGenericType() != null) {
+            genericParam = "<" + node.getGenericType() + ">";
+        }
+        
+        result.append(indent()).append("pub enum ").append(node.getName()).append(genericParam).append(" {\n");
+        
+        // Increase indent for enum variants
+        increaseIndent();
+        
+        // Add enum variants
+        for (EnumDeclarationNode.EnumVariant variant : node.getVariants()) {
+            result.append(indent()).append(variant.getName());
+            
+            // Add variant fields if any
+            java.util.List<TypeNode> fieldTypes = variant.getFieldTypes();
+            if (!fieldTypes.isEmpty()) {
+                result.append("(");
+                for (int i = 0; i < fieldTypes.size(); i++) {
+                    if (i > 0) result.append(", ");
+                    result.append(translateType(fieldTypes.get(i)));
+                }
+                result.append(")");
+            }
+            
+            result.append(",\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitImplementation(ImplementationNode node) {
+        StringBuilder result = new StringBuilder();
+        
+        result.append(indent()).append("impl");
+        
+        // Handle trait implementation
+        if (node.getTraitName() != null) {
+            result.append(" ").append(node.getTraitName()).append(" for");
+        }
+        
+        result.append(" ").append(node.getTargetType()).append(" {\n");
+        
+        // Increase indent for implementation methods
+        increaseIndent();
+        
+        // Add methods
+        for (ASTNode method : node.getMethods()) {
+            result.append(method.accept(this));
+            result.append("\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitLifetime(LifetimeNode node) {
+        return "'" + node.getName();
+    }
+    
+    @Override
+    public String visitInterfaceDeclaration(InterfaceDeclarationNode node) {
+        // Convert TypeScript interface to Rust trait
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("// TypeScript interface converted to Rust trait\n");
+        result.append(indent()).append("pub trait ").append(node.getName());
+        
+        // Handle generic type parameter
+        if (node.getGenericType() != null) {
+            result.append("<").append(node.getGenericType()).append(">");
+        }
+        
+        result.append(" {\n");
+        
+        // Increase indent for trait contents
+        increaseIndent();
+        
+        // Convert interface members to trait methods
+        for (InterfaceDeclarationNode.InterfaceMember member : node.getMembers()) {
+            result.append(indent()).append("fn ").append(member.getName()).append("(&self)");
+            if (member.isOptional()) {
+                result.append(" -> Option<").append(translateType(member.getType())).append(">");
+            } else {
+                result.append(" -> ").append(translateType(member.getType()));
+            }
+            result.append(";\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitTypeAliasDeclaration(TypeAliasDeclarationNode node) {
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("type ").append(node.getName());
+        
+        // Handle generic type parameter
+        if (node.getGenericType() != null) {
+            result.append("<").append(node.getGenericType()).append(">");
+        }
+        
+        result.append(" = ").append(translateType(node.getAliasedType())).append(";\n");
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitDecorator(DecoratorNode node) {
+        // Rust attributes are similar to TypeScript decorators
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("#[").append(node.getName());
+        
+        // Add decorator arguments if any
+        if (!node.getArguments().isEmpty()) {
+            result.append("(");
+            java.util.List<ExpressionNode> args = node.getArguments();
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) result.append(", ");
+                result.append(args.get(i).accept(this));
+            }
+            result.append(")");
+        }
+        
+        result.append("]\n");
+        
+        // Add the decorated target
+        result.append(node.getTarget().accept(this));
+        
+        return result.toString();
     }
 }

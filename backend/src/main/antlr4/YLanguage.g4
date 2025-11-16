@@ -49,13 +49,17 @@ matchCase : 'case' matchPattern block ;
 matchPattern : identifier 'as' type
                | identifier 'as' type 'with' identifier
                | identifier
+               | 'range' expression 'to' expression
+               | 'guard' expression 'where' expression
                ;
 
 moduleDeclaration : 'module' identifier 'begin' statement+ 'end' ;
 
 traitDeclaration : 'define' 'trait' identifier 'begin' functionSignature+ 'end' ;
 
-structureDeclaration : 'create' 'structure' identifier ('with' 'generic' 'type' identifier)? ('that' 'implements' identifier)? 'begin' statement+ 'end' ;
+structureDeclaration : 'create' 'structure' identifier ('with' 'generic' 'type' identifier)? ('that' 'implements' identifier)? 'begin' structureMember+ 'end' ;
+
+structureMember : 'create' 'field' identifier 'as' type ';' ;
 
 functionSignature : 'create' 'function' identifier 'with' 'parameters' parameterList 'that' 'returns' type ';' ;
 
@@ -63,18 +67,35 @@ importStatement : 'import' identifier ;
 
 expressionStatement : expression ';' ;
 
-expression : literal
-           | identifier
-           | functionCall
-           | binaryExpression
-           | unaryExpression
-           | conditionalExpression
-           | memberAccess
-           | listExpression
-           | mapExpression
-           | typeCast
-           | parenthesizedExpression
-           ;
+expression : conditionalExpression ;
+
+conditionalExpression : logicalOrExpression ('if' logicalOrExpression 'otherwise' conditionalExpression)? ;
+
+logicalOrExpression : logicalAndExpression ('or' logicalAndExpression)* ;
+
+logicalAndExpression : equalityExpression ('and' equalityExpression)* ;
+
+equalityExpression : relationalExpression (('equals' | 'not' 'equals') relationalExpression)* ;
+
+relationalExpression : additiveExpression (('is' 'greater' 'than' | 'is' 'less' 'than' | 'is' 'greater' 'than' 'or' 'equals' | 'is' 'less' 'than' 'or' 'equals') additiveExpression)* ;
+
+additiveExpression : multiplicativeExpression (('plus' | 'minus') multiplicativeExpression)* ;
+
+multiplicativeExpression : unaryExpression (('times' | 'divided' 'by' | 'modulo') unaryExpression)* ;
+
+unaryExpression : 'not' unaryExpression
+                | 'minus' unaryExpression
+                | postfixExpression
+                ;
+
+postfixExpression : primaryExpression (memberAccess | functionCall | typeCast)* ;
+
+primaryExpression : literal
+                   | identifier
+                   | listExpression
+                   | mapExpression
+                   | parenthesizedExpression
+                   ;
 
 literal : STRING
          | NUMBER
@@ -88,26 +109,6 @@ functionCall : identifier 'with' argumentList
              ;
 
 argumentList : expression ('and' expression)* | 'nothing' ;
-
-binaryExpression : expression operator expression ;
-
-operator : 'plus'
-         | 'minus'
-         | 'times'
-         | 'divided' 'by'
-         | 'equals'
-         | 'is' 'greater' 'than'
-         | 'is' 'less' 'than'
-         | 'and'
-         | OR_KEYWORD
-         | 'modulo'
-         ;
-
-unaryExpression : 'not' expression
-                | 'minus' expression
-                ;
-
-conditionalExpression : expression 'if' expression 'otherwise' expression ;
 
 memberAccess : expression 'at' expression
              | expression 'dot' identifier
@@ -137,6 +138,7 @@ type : 'string'
      | 'function' 'that' 'takes' type 'and' 'returns' type
      | 'reference' 'to' type
      | 'box' 'of' type
+     | 'lifetime' 'of' type
      | identifier
      | genericType
      ;
@@ -144,6 +146,8 @@ type : 'string'
 genericType : type '(' 'Yummy:' 'generic' 'type' identifier ')' ;
 
 identifier : IDENTIFIER ;
+
+lifetime : '\'' IDENTIFIER ;
 
 // Lexer Rules
 IDENTIFIER : [a-zA-Z_][a-zA-Z0-9_]* ;
@@ -207,8 +211,7 @@ BOOLEAN_TYPE : 'boolean' ;
 NOTHING_TYPE : 'nothing' ;
 ANY_TYPE : 'any' ;
 EITHER : 'either' ;
-OR_KEYWORD : 'or' ;
-FUNCTION_TYPE : 'function' ;
+
 TAKES : 'takes' ;
 REFERENCE : 'reference' ;
 BOX : 'box' ;
@@ -218,9 +221,16 @@ GENERIC : 'generic' ;
 TYPE : 'type' ;
 DOT : 'dot' ;
 AT : 'at' ;
+BORROWS : 'borrows' ;
+OWNS : 'owns' ;
+LIFETIME : 'lifetime' ;
+FIELD : 'field' ;
+RANGE : 'range' ;
+GUARD : 'guard' ;
+WHERE : 'where' ;
 
 // Whitespace and Comments
 WS : [ \t\r\n]+ -> skip ;
 COMMENT : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT : '/*' .*? '*/' -> skip ;
-YUMMY_COMMENT : '(' 'Yummy:' (~[')'])* ')' -> skip ;
+YUMMY_COMMENT : '(' 'Yummy:' (~[)])* ')' -> skip ;

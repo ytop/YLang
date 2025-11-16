@@ -409,14 +409,69 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
     
     @Override
     public String visitTryStatement(TryStatementNode node) {
-        // TODO: Implement try-catch translation
-        return "// Try statement not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("try {\n");
+        
+        // Increase indent for try block
+        increaseIndent();
+        result.append(node.getTryBlock().accept(this));
+        decreaseIndent();
+        
+        // Handle catch blocks
+        for (TryStatementNode.CatchClause catchClause : node.getCatchClauses()) {
+            result.append(indent()).append("catch (").append(catchClause.getVariableName());
+            if (catchClause.getExceptionType() != null) {
+                result.append(": ").append(translateType(catchClause.getExceptionType()));
+            }
+            result.append(") {\n");
+            
+            increaseIndent();
+            result.append(catchClause.getCatchBlock().accept(this));
+            decreaseIndent();
+            result.append(indent()).append("}\n");
+        }
+        
+        return result.toString();
     }
     
     @Override
     public String visitMatchStatement(MatchStatementNode node) {
-        // TODO: Implement match statement translation
-        return "// Match statement not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("switch (").append(node.getExpression().accept(this)).append(") {\n");
+        
+        for (MatchStatementNode.MatchCase matchCase : node.getCases()) {
+            increaseIndent();
+            
+            // Handle different pattern types
+            String pattern = matchCase.getPattern();
+            if (matchCase.getType() != null) {
+                if (matchCase.getVariableName() != null) {
+                    // Pattern with variable binding - use case with destructuring
+                    result.append(indent()).append("case ").append(pattern).append(": {\n");
+                    increaseIndent();
+                    result.append(indent()).append("const ").append(matchCase.getVariableName()).append(" = ").append(pattern).append(";\n");
+                } else {
+                    // Simple type pattern
+                    result.append(indent()).append("case ").append(pattern).append(": {\n");
+                    increaseIndent();
+                }
+            } else {
+                // Simple identifier pattern
+                result.append(indent()).append("case ").append(pattern).append(": {\n");
+                increaseIndent();
+            }
+            
+            // Add case block
+            result.append(matchCase.getBlock().accept(this));
+            result.append(indent()).append("break;\n");
+            
+            decreaseIndent();
+            result.append(indent()).append("}\n");
+            decreaseIndent();
+        }
+        
+        result.append(indent()).append("}\n");
+        return result.toString();
     }
     
     @Override
@@ -427,26 +482,97 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
     
     @Override
     public String visitModuleDeclaration(ModuleDeclarationNode node) {
-        // TODO: Implement module translation
-        return "// Module declaration not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("namespace ").append(node.getName()).append(" {\n");
+        
+        // Increase indent for module contents
+        increaseIndent();
+        
+        // Add module statements
+        for (ASTNode statement : node.getStatements()) {
+            result.append(statement.accept(this));
+            result.append("\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
     }
     
     @Override
     public String visitTraitDeclaration(TraitDeclarationNode node) {
-        // TODO: Implement trait translation
-        return "// Trait declaration not yet implemented";
+        StringBuilder result = new StringBuilder();
+        result.append(indent()).append("interface ").append(node.getName()).append(" {\n");
+        
+        // Increase indent for interface contents
+        increaseIndent();
+        
+        // Add function signatures
+        for (FunctionSignatureNode signature : node.getFunctionSignatures()) {
+            result.append(indent()).append(signature.getName()).append("(");
+            
+            // Add parameters
+            List<ParameterNode> parameters = signature.getParameters();
+            for (int i = 0; i < parameters.size(); i++) {
+                if (i > 0) result.append(", ");
+                ParameterNode param = parameters.get(i);
+                result.append(param.getName()).append(": ").append(translateType(param.getType()));
+            }
+            
+            result.append(")");
+            
+            // Add return type
+            if (signature.getReturnType() != null && !signature.getReturnType().isNothingType()) {
+                result.append(": ").append(translateType(signature.getReturnType()));
+            }
+            
+            result.append(";\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
     }
     
     @Override
     public String visitStructureDeclaration(StructureDeclarationNode node) {
-        // TODO: Implement structure translation
-        return "// Structure declaration not yet implemented";
+        StringBuilder result = new StringBuilder();
+        
+        // Handle generic type parameter
+        String genericParam = "";
+        if (node.getGenericType() != null) {
+            genericParam = "<" + node.getGenericType() + ">";
+        }
+        
+        result.append(indent()).append("class ").append(node.getName()).append(genericParam);
+        
+        // Handle interface implementation
+        if (node.getImplementsTrait() != null) {
+            result.append(" implements ").append(node.getImplementsTrait());
+        }
+        
+        result.append(" {\n");
+        
+        // Increase indent for class contents
+        increaseIndent();
+        
+        // Add structure members
+        for (ASTNode member : node.getMembers()) {
+            result.append(statement.accept(this));
+            result.append("\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
     }
     
     @Override
     public String visitImportStatement(ImportStatementNode node) {
-        // TODO: Implement import translation
-        return "// Import statement not yet implemented";
+        return "import { " + node.getModuleName() + " } from './" + node.getModuleName() + "';\n";
     }
     
     @Override
@@ -469,30 +595,210 @@ public class TypeScriptTranslator implements ASTVisitor<String> {
     
     @Override
     public String visitMemberAccess(MemberAccessNode node) {
-        // TODO: Implement member access translation
-        return "// Member access not yet implemented";
+        String object = node.getObject().accept(this);
+        String member = node.getMember().accept(this);
+        
+        if (node.isArrayAccess()) {
+            return object + "[" + member + "]";
+        } else {
+            return object + "." + member;
+        }
     }
     
     @Override
     public String visitListExpression(ListExpressionNode node) {
-        // TODO: Implement list expression translation
-        return "[]";
+        StringBuilder result = new StringBuilder();
+        result.append("[");
+        
+        List<ExpressionNode> elements = node.getElements();
+        for (int i = 0; i < elements.size(); i++) {
+            if (i > 0) result.append(", ");
+            result.append(elements.get(i).accept(this));
+        }
+        
+        result.append("]");
+        return result.toString();
     }
     
     @Override
     public String visitMapExpression(MapExpressionNode node) {
-        // TODO: Implement map expression translation
-        return "{}";
+        StringBuilder result = new StringBuilder();
+        result.append("{\n");
+        
+        List<MapEntryNode> entries = node.getEntries();
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) result.append(",\n");
+            result.append(indent()).append(INDENT);
+            
+            // Handle key - if it's a string, don't quote it again
+            String key = entries.get(i).getKey().accept(this);
+            if (key.startsWith("\"") && key.endsWith("\"")) {
+                result.append(key);
+            } else {
+                result.append("[").append(key).append("]");
+            }
+            
+            result.append(": ").append(entries.get(i).getValue().accept(this));
+        }
+        
+        result.append("\n").append(indent()).append("}");
+        return result.toString();
     }
     
     @Override
     public String visitTypeCast(TypeCastNode node) {
-        // TODO: Implement type cast translation
-        return node.getExpression().accept(this);
+        String expression = node.getExpression().accept(this);
+        
+        switch (node.getCastType()) {
+            case TO_STRING:
+                return expression + ".toString()";
+            case TO_NUMBER:
+                return "Number(" + expression + ")";
+            case TO_BOOLEAN:
+                return "Boolean(" + expression + ")";
+            default:
+                return expression;
+        }
     }
     
     @Override
     public String visitParenthesizedExpression(ParenthesizedExpressionNode node) {
         return "(" + node.getExpression().accept(this) + ")";
+    }
+    
+    @Override
+    public String visitEnumDeclaration(EnumDeclarationNode node) {
+        StringBuilder result = new StringBuilder();
+        
+        result.append(indent()).append("enum ").append(node.getName()).append(" {\n");
+        
+        // Increase indent for enum variants
+        increaseIndent();
+        
+        // Add enum variants
+        for (EnumDeclarationNode.EnumVariant variant : node.getVariants()) {
+            result.append(indent()).append(variant.getName());
+            
+            // Add variant fields if any
+            java.util.List<TypeNode> fieldTypes = variant.getFieldTypes();
+            if (!fieldTypes.isEmpty()) {
+                result.append(" = ");
+                // For TypeScript, we'll use numeric enums for simple variants
+                result.append("\"").append(variant.getName()).append("\"");
+            }
+            
+            result.append(",\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitImplementation(ImplementationNode node) {
+        StringBuilder result = new StringBuilder();
+        
+        // For TypeScript, we'll create a class or add methods to existing class
+        result.append(indent()).append("// Implementation for ").append(node.getTargetType());
+        if (node.getTraitName() != null) {
+            result.append(" implementing ").append(node.getTraitName());
+        }
+        result.append("\n");
+        
+        // Add methods as standalone functions or class methods
+        for (ASTNode method : node.getMethods()) {
+            result.append(method.accept(this));
+            result.append("\n");
+        }
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitLifetime(LifetimeNode node) {
+        // Lifetimes are not used in TypeScript, return empty string
+        return "";
+    }
+    
+    @Override
+    public String visitInterfaceDeclaration(InterfaceDeclarationNode node) {
+        StringBuilder result = new StringBuilder();
+        
+        // Handle generic type parameter
+        String genericParam = "";
+        if (node.getGenericType() != null) {
+            genericParam = "<" + node.getGenericType() + ">";
+        }
+        
+        result.append(indent()).append("interface ").append(node.getName()).append(genericParam).append(" {\n");
+        
+        // Increase indent for interface contents
+        increaseIndent();
+        
+        // Add interface members
+        for (InterfaceDeclarationNode.InterfaceMember member : node.getMembers()) {
+            result.append(indent());
+            
+            if (member.isReadonly()) {
+                result.append("readonly ");
+            }
+            
+            result.append(member.getName());
+            
+            if (member.isOptional()) {
+                result.append("?");
+            }
+            
+            result.append(": ").append(translateType(member.getType())).append(";\n");
+        }
+        
+        decreaseIndent();
+        result.append(indent()).append("}\n");
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitTypeAliasDeclaration(TypeAliasDeclarationNode node) {
+        StringBuilder result = new StringBuilder();
+        
+        // Handle generic type parameter
+        String genericParam = "";
+        if (node.getGenericType() != null) {
+            genericParam = "<" + node.getGenericType() + ">";
+        }
+        
+        result.append(indent()).append("type ").append(node.getName()).append(genericParam);
+        result.append(" = ").append(translateType(node.getAliasedType())).append(";\n");
+        
+        return result.toString();
+    }
+    
+    @Override
+    public String visitDecorator(DecoratorNode node) {
+        StringBuilder result = new StringBuilder();
+        
+        // Add decorator
+        result.append("@").append(node.getName());
+        
+        // Add decorator arguments if any
+        if (!node.getArguments().isEmpty()) {
+            result.append("(");
+            java.util.List<ExpressionNode> args = node.getArguments();
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) result.append(", ");
+                result.append(args.get(i).accept(this));
+            }
+            result.append(")");
+        }
+        
+        result.append("\n");
+        
+        // Add the decorated target
+        result.append(node.getTarget().accept(this));
+        
+        return result.toString();
     }
 }

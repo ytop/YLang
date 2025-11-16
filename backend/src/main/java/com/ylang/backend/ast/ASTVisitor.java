@@ -19,6 +19,12 @@ public interface ASTVisitor<T> {
     T visitStructureDeclaration(StructureDeclarationNode node);
     T visitImportStatement(ImportStatementNode node);
     T visitExpressionStatement(ExpressionStatementNode node);
+    T visitEnumDeclaration(EnumDeclarationNode node);
+    T visitImplementation(ImplementationNode node);
+    T visitLifetime(LifetimeNode node);
+    T visitInterfaceDeclaration(InterfaceDeclarationNode node);
+    T visitTypeAliasDeclaration(TypeAliasDeclarationNode node);
+    T visitDecorator(DecoratorNode node);
     
     // Expression visitors
     T visitLiteral(LiteralNode node);
